@@ -82,6 +82,7 @@ class ManagerCreateSerializer(serializers.ModelSerializer):
             description=validated_data.get('description', ''),
             role='MANAGER',
             is_staff=True,
+            plain_password=raw_password,
         )
         user.set_password(raw_password)
         user.save()
@@ -105,10 +106,11 @@ class ManagerCreateSerializer(serializers.ModelSerializer):
 
 class ManagerListSerializer(serializers.ModelSerializer):
     department = serializers.CharField(source='department.name', default=None)
+    password = serializers.CharField(source='plain_password', read_only=True)
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'phone_number', 'first_name', 'last_name', 'department', 'description']
+        fields = ['id', 'username', 'phone_number', 'first_name', 'last_name', 'department', 'description', 'password']
 
 class EmployeeBulkCreateSerializer(serializers.Serializer):
     exam_id = serializers.PrimaryKeyRelatedField(
@@ -158,7 +160,8 @@ class EmployeeBulkCreateSerializer(serializers.Serializer):
                 department=exam.department, # Auto assign from exam's department
                 assigned_exam=exam, # Link to the exam
                 role='EMPLOYEE',
-                is_active=True
+                is_active=True,
+                plain_password=raw_password
             )
             user.set_password(raw_password)
             user.save()
@@ -183,12 +186,13 @@ class EmployeeBulkCreateSerializer(serializers.Serializer):
 class EmployeeListSerializer(serializers.ModelSerializer):
     department = serializers.CharField(source='department.name', default="Bo'lim biriktirilmagan")
     assigned_exam = serializers.SerializerMethodField()
+    password = serializers.CharField(source='plain_password', read_only=True)
 
     class Meta:
         model = User
         fields = [
             'id', 'first_name', 'last_name', 'username', 
-            'phone_number', 'department', 'assigned_exam'
+            'phone_number', 'department', 'assigned_exam', 'password'
         ]
 
     @extend_schema_field(serializers.CharField())

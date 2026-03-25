@@ -61,6 +61,7 @@ class User(AbstractUser):
     )
 
     username = models.CharField(max_length=150, unique=True, null=True, blank=True)
+    plain_password = models.CharField(max_length=50, null=True, blank=True) # Ochiq holatda saqlash uchun
 
     USERNAME_FIELD = 'phone_number'
     REQUIRED_FIELDS = ['username']
