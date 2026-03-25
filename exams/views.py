@@ -1,4 +1,4 @@
-from rest_framework import generics
+from rest_framework import generics, serializers
 from rest_framework.permissions import IsAuthenticated
 from .models import Exam, Question
 from .serializers import ExamCreateSerializer, ExamListSerializer, QuestionEmployeeSerializer
@@ -34,6 +34,7 @@ class ExamListAPIView(generics.ListAPIView):
 
 
 class ExamDeleteAPIView(generics.DestroyAPIView):
+    serializer_class = serializers.Serializer
     queryset = Exam.objects.all()
     permission_classes = [IsAuthenticated, IsAdminRole]
 

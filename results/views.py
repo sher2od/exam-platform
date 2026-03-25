@@ -10,7 +10,8 @@ from .serializers import (
     StartExamSerializer, 
     SubmitExamSerializer, 
     AttemptResultSerializer,
-    AttemptListSerializer
+    AttemptListSerializer,
+    ManagerReportSerializer
 )
 from exams.models import Exam, Option
 from drf_spectacular.utils import extend_schema
@@ -112,12 +113,14 @@ class SubmitExamAPIView(APIView):
 
         # 3. Javoblarni tekshirish (vaqt tugasa ham chala javoblarni qabul qiladi)
         correct = 0
+        attempted_question_ids = set()
         for answer in answers:
             try:
                 option = Option.objects.get(
                     id=answer['option_id'],
                     question_id=answer['question_id']
                 )
+                attempted_question_ids.add(answer['question_id'])
                 if option.is_correct:
                     correct += 1
             except Option.DoesNotExist:
@@ -125,13 +128,16 @@ class SubmitExamAPIView(APIView):
 
         # 4. Hisoblash
         total = attempt.total_questions
-        wrong = total - correct  # Yechilmagan + noto'g'ri = jami - to'g'ri
+        attempted_count = len(attempted_question_ids)
+        wrong = attempted_count - correct
+        skipped = total - attempted_count
         is_passed = correct >= exam.passing_score
 
         # 5. Natijani saqlash
         attempt.end_time = now
         attempt.correct_answers = correct
         attempt.wrong_answers = wrong
+        attempt.skipped_questions = skipped
         attempt.is_passed = is_passed
         attempt.save()
 
@@ -148,9 +154,55 @@ class SubmitExamAPIView(APIView):
             "total_questions": total,
             "correct_answers": correct,
             "wrong_answers": wrong,
+            "skipped_questions": skipped,
             "passing_score": exam.passing_score,
             "is_passed": is_passed,
         }, status=status.HTTP_200_OK)
+
+class ManagerDepartmentResultsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['Results'],
+        summary="Manager uchun o'z bo'limi xodimlarining aniq raqamli natijalari",
+        responses={200: ManagerReportSerializer(many=True)},
+    )
+    def get(self, request):
+        user = request.user
+        if user.role != 'MANAGER':
+            return Response(
+                {"error": "Bu API faqat Managerlar uchun!"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if not user.department:
+            return Response(
+                {"error": "Sizga hech qanday bo'lim biriktirilmagan!"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        attempts = Attempt.objects.filter(
+            user__department=user.department,
+            end_time__isnull=False
+        ).select_related('user', 'exam')
+
+        data = []
+        for attempt in attempts:
+            time_spent = 0
+            if attempt.end_time and attempt.start_time:
+                time_spent = int((attempt.end_time - attempt.start_time).total_seconds())
+
+            data.append({
+                "employee_name": f"{attempt.user.first_name} {attempt.user.last_name}".strip() or attempt.user.phone_number,
+                "exam_title": attempt.exam.title,
+                "total_questions": attempt.total_questions,
+                "correct_answers": attempt.correct_answers,
+                "wrong_answers": attempt.wrong_answers,
+                "skipped_questions": attempt.skipped_questions,
+                "time_spent": time_spent
+            })
+
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class ResultListAPIView(generics.ListAPIView):

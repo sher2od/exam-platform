@@ -20,6 +20,7 @@ class Attempt(BaseModel):
     total_questions = models.IntegerField(default=0)
     correct_answers = models.IntegerField(default=0)
     wrong_answers = models.IntegerField(default=0)
+    skipped_questions = models.IntegerField(default=0)
     percentage = models.FloatField(default=0.0)
     is_passed = models.BooleanField(default=False)
 

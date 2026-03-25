@@ -4,6 +4,7 @@ from io import BytesIO
 from rest_framework import serializers
 from django.db.models import Q
 from .models import User
+from drf_spectacular.utils import extend_schema_field
 from departments.models import Department
 from exams.models import Exam
 
@@ -190,6 +191,7 @@ class EmployeeListSerializer(serializers.ModelSerializer):
             'phone_number', 'department', 'assigned_exam'
         ]
 
+    @extend_schema_field(serializers.CharField())
     def get_assigned_exam(self, obj):
         if obj.assigned_exam:
             return obj.assigned_exam.title

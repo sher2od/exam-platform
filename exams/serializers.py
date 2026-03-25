@@ -3,6 +3,7 @@ from .models import Exam, Question, Option
 from departments.models import Department
 import openpyxl
 from io import BytesIO
+from drf_spectacular.utils import extend_schema_field
 
 
 class ExamCreateSerializer(serializers.Serializer):
@@ -104,6 +105,7 @@ class ExamListSerializer(serializers.ModelSerializer):
         model = Exam
         fields = ['id', 'title', 'department', 'duration', 'passing_score', 'questions_count']
 
+    @extend_schema_field(serializers.IntegerField())
     def get_questions_count(self, obj):
         return obj.questions.count()
 
@@ -123,6 +125,7 @@ class QuestionEmployeeSerializer(serializers.ModelSerializer):
         model = Question
         fields = ['id', 'text', 'options']
 
+    @extend_schema_field(OptionEmployeeSerializer(many=True))
     def get_options(self, obj):
         # Variantlarni savol uchun random (shuffled) tartibda qaytarish
         options = Option.objects.filter(question=obj).order_by('?')

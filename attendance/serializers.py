@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Attendance
+from drf_spectacular.utils import extend_schema_field
 
 class AttendanceSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
@@ -14,5 +15,6 @@ class AttendanceSerializer(serializers.ModelSerializer):
             'device_info', 'created_at'
         ]
 
+    @extend_schema_field(serializers.CharField())
     def get_full_name(self, obj):
         return f"{obj.user.first_name} {obj.user.last_name}"

@@ -12,6 +12,7 @@ from .serializers import (
     EmployeeBulkCreateSerializer,
     EmployeeListSerializer
 )
+from rest_framework import serializers
 from .permissions import IsAdminRole
 from .models import User
 from drf_spectacular.utils import extend_schema
@@ -87,6 +88,7 @@ class ManagerListAPIView(generics.ListAPIView):
 
 
 class ManagerDeleteAPIView(generics.DestroyAPIView):
+    serializer_class = serializers.Serializer
     permission_classes = [IsAdminRole]
 
     def get_queryset(self):
@@ -107,6 +109,7 @@ class ManagerDeleteAPIView(generics.DestroyAPIView):
 
 
 class EmployeeBulkCreateAPIView(APIView):
+    serializer_class = EmployeeBulkCreateSerializer
     permission_classes = [IsAdminRole]
 
     @extend_schema(
@@ -140,6 +143,7 @@ class EmployeeListAPIView(generics.ListAPIView):
 
 
 class EmployeeDeleteAPIView(generics.DestroyAPIView):
+    serializer_class = serializers.Serializer
     permission_classes = [IsAuthenticated, IsAdminRole]
 
     def get_queryset(self):

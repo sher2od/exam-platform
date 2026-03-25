@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Attempt
+from drf_spectacular.utils import extend_schema_field
 
 
 class StartExamSerializer(serializers.Serializer):
@@ -41,6 +42,7 @@ class AttemptListSerializer(serializers.ModelSerializer):
             'correct_answers', 'wrong_answers', 'is_passed', 'start_time'
         ]
 
+    @extend_schema_field(serializers.DictField())
     def get_user(self, obj):
         return {
             'full_name': f"{obj.user.first_name} {obj.user.last_name}",
@@ -48,8 +50,18 @@ class AttemptListSerializer(serializers.ModelSerializer):
             'phone_number': obj.user.phone_number
         }
 
+    @extend_schema_field(serializers.DictField())
     def get_exam(self, obj):
         return {
             'title': obj.exam.title,
             'department': obj.exam.department.name if obj.exam.department else None
         }
+
+class ManagerReportSerializer(serializers.Serializer):
+    employee_name = serializers.CharField()
+    exam_title = serializers.CharField()
+    total_questions = serializers.IntegerField()
+    correct_answers = serializers.IntegerField()
+    wrong_answers = serializers.IntegerField()
+    skipped_questions = serializers.IntegerField()
+    time_spent = serializers.IntegerField()
