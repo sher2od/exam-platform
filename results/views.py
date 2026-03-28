@@ -5,15 +5,16 @@ from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from .models import Attempt
+from .models import Attempt, UserAnswer
 from .serializers import (
     StartExamSerializer, 
     SubmitExamSerializer, 
     AttemptResultSerializer,
     AttemptListSerializer,
+    AttemptDetailSerializer,
     ManagerReportSerializer
 )
-from exams.models import Exam, Option
+from exams.models import Exam
 from drf_spectacular.utils import extend_schema
 
 
@@ -111,20 +112,45 @@ class SubmitExamAPIView(APIView):
         deadline = attempt.start_time + timedelta(minutes=exam.duration)
         is_timeout = now > deadline
 
-        # 3. Javoblarni tekshirish (vaqt tugasa ham chala javoblarni qabul qiladi)
+        # 3. Javoblarni tekshirish va batafsil tahlil
         correct = 0
         attempted_question_ids = set()
-        for answer in answers:
-            try:
-                option = Option.objects.get(
-                    id=answer['option_id'],
-                    question_id=answer['question_id']
-                )
-                attempted_question_ids.add(answer['question_id'])
-                if option.is_correct:
+        question_details = []
+        user_answer_objects = []
+
+        all_questions = exam.questions.all().prefetch_related('options')
+        user_answers = {a['question_id']: a['option_id'] for a in answers}
+
+        for q in all_questions:
+            correct_option = q.options.filter(is_correct=True).first()
+            correct_option_id = correct_option.id if correct_option else None
+
+            selected_option_id = user_answers.get(q.id)
+            is_correct = False
+
+            if selected_option_id is not None:
+                attempted_question_ids.add(q.id)
+                if selected_option_id == correct_option_id:
                     correct += 1
-            except Option.DoesNotExist:
-                pass
+                    is_correct = True
+
+            question_details.append({
+                "question_id": q.id,
+                "selected_option_id": selected_option_id,
+                "correct_option_id": correct_option_id,
+                "is_correct": is_correct,
+            })
+
+            # DBga saqlash uchun ob'ekt yaratish
+            user_answer_objects.append(UserAnswer(
+                attempt=attempt,
+                question=q,
+                selected_option_id=selected_option_id,
+                is_correct=is_correct
+            ))
+
+        # 3.1. Javoblarni bazaga saqlash
+        UserAnswer.objects.bulk_create(user_answer_objects)
 
         # 4. Hisoblash
         total = attempt.total_questions
@@ -132,6 +158,7 @@ class SubmitExamAPIView(APIView):
         wrong = attempted_count - correct
         skipped = total - attempted_count
         is_passed = correct >= exam.passing_score
+        percentage = round((correct / total * 100), 1) if total > 0 else 0.0
 
         # 5. Natijani saqlash
         attempt.end_time = now
@@ -139,6 +166,7 @@ class SubmitExamAPIView(APIView):
         attempt.wrong_answers = wrong
         attempt.skipped_questions = skipped
         attempt.is_passed = is_passed
+        attempt.percentage = percentage
         attempt.save()
 
         # 6. Testdan so'ng xodimni bloklash (faqat xodim bo'lsa)
@@ -156,7 +184,9 @@ class SubmitExamAPIView(APIView):
             "wrong_answers": wrong,
             "skipped_questions": skipped,
             "passing_score": exam.passing_score,
+            "percentage": percentage,
             "is_passed": is_passed,
+            "question_details": question_details,
         }, status=status.HTTP_200_OK)
 
 class ManagerDepartmentResultsAPIView(APIView):
@@ -203,6 +233,22 @@ class ManagerDepartmentResultsAPIView(APIView):
             })
 
         return Response(data, status=status.HTTP_200_OK)
+
+
+class AttemptDetailAPIView(generics.RetrieveAPIView):
+    queryset = Attempt.objects.all().prefetch_related('answers', 'answers__question', 'answers__selected_option')
+    serializer_class = AttemptDetailSerializer
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['Results'],
+        summary='Urinish detallari (Barcha javoblar bilan)',
+    )
+    def get(self, request, *args, **kwargs):
+        # Admin yoki Manager bo'lishi kerak
+        if request.user.role == 'EMPLOYEE':
+            return Response({'error': 'Xodimlar urinish detallarini ko\'ra olmaydi!'}, status=status.HTTP_403_FORBIDDEN)
+        return super().get(request, *args, **kwargs)
 
 
 class ResultListAPIView(generics.ListAPIView):

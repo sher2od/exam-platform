@@ -129,14 +129,22 @@ class EmployeeBulkCreateAPIView(APIView):
 
 class EmployeeListAPIView(generics.ListAPIView):
     serializer_class = EmployeeListSerializer
-    permission_classes = [IsAuthenticated, IsAdminRole]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return User.objects.filter(role='EMPLOYEE').select_related('department', 'assigned_exam').order_by('-id')
+        user = self.request.user
+        qs = User.objects.filter(role='EMPLOYEE').select_related('department', 'assigned_exam').order_by('-id')
+        
+        if user.role == 'ADMIN':
+            return qs
+        if user.role == 'MANAGER':
+            return qs.filter(department=user.department)
+            
+        return User.objects.none()
 
     @extend_schema(
         tags=['Users - Employee'],
-        summary='Barcha xodimlarni va ularga biriktirilgan testlarni ko\'rish (faqat ADMIN)',
+        summary='Barcha xodimlarni va ularga biriktirilgan testlarni ko\'rish (Admin hamma, Manager o\'z bo\'limini)',
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)

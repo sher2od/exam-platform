@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Attempt
+from .models import Attempt, UserAnswer
+from exams.models import Option
 from drf_spectacular.utils import extend_schema_field
 
 
@@ -39,7 +40,7 @@ class AttemptListSerializer(serializers.ModelSerializer):
         model = Attempt
         fields = [
             'id', 'user', 'exam', 'total_questions', 
-            'correct_answers', 'wrong_answers', 'is_passed', 'start_time'
+            'correct_answers', 'wrong_answers', 'skipped_questions', 'is_passed', 'start_time'
         ]
 
     @extend_schema_field(serializers.DictField())
@@ -65,3 +66,24 @@ class ManagerReportSerializer(serializers.Serializer):
     wrong_answers = serializers.IntegerField()
     skipped_questions = serializers.IntegerField()
     time_spent = serializers.IntegerField()
+
+
+class UserAnswerSerializer(serializers.ModelSerializer):
+    question_text = serializers.CharField(source='question.text')
+    selected_option_text = serializers.CharField(source='selected_option.text', allow_null=True)
+    correct_option_text = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserAnswer
+        fields = ['question_text', 'selected_option_text', 'correct_option_text', 'is_correct']
+
+    def get_correct_option_text(self, obj):
+        correct = Option.objects.filter(question=obj.question, is_correct=True).first()
+        return correct.text if correct else None
+
+
+class AttemptDetailSerializer(AttemptListSerializer):
+    answers = UserAnswerSerializer(many=True, read_only=True)
+
+    class Meta(AttemptListSerializer.Meta):
+        fields = AttemptListSerializer.Meta.fields + ['answers']

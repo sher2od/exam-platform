@@ -1,7 +1,13 @@
-from rest_framework import generics, serializers
+from rest_framework import generics, serializers, status
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import Exam, Question
-from .serializers import ExamCreateSerializer, ExamListSerializer, QuestionEmployeeSerializer
+from .serializers import (
+    ExamCreateSerializer, 
+    ExamListSerializer, 
+    QuestionEmployeeSerializer, 
+    QuestionAdminSerializer
+)
 from users.permissions import IsAdminRole
 from drf_spectacular.utils import extend_schema
 
@@ -27,10 +33,26 @@ class ExamListAPIView(generics.ListAPIView):
 
     @extend_schema(
         tags=['Exams'],
-        summary='Barcha testlar ro\'yxati',
+        summary='Barcha testlar ro\'yxati (Admin hamma, Manager o\'z bo\'limini)',
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
+
+
+class ExamRetrieveAPIView(generics.RetrieveAPIView):
+    queryset = Exam.objects.all()
+    serializer_class = ExamListSerializer
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def get(self, request, *args, **kwargs):
+        exam = self.get_object()
+        questions = Question.objects.filter(exam=exam).prefetch_related('options')
+        serializer = QuestionAdminSerializer(questions, many=True)
+        return Response({
+            "id": exam.id,
+            "title": exam.title,
+            "questions": serializer.data
+        })
 
 
 class ExamDeleteAPIView(generics.DestroyAPIView):

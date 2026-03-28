@@ -130,3 +130,16 @@ class QuestionEmployeeSerializer(serializers.ModelSerializer):
         # Variantlarni savol uchun random (shuffled) tartibda qaytarish
         options = Option.objects.filter(question=obj).order_by('?')
         return OptionEmployeeSerializer(options, many=True).data
+
+# --- Admin serializers for Viewing questions ---
+
+class OptionAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Option
+        fields = ['id', 'text', 'is_correct']
+
+class QuestionAdminSerializer(serializers.ModelSerializer):
+    options = OptionAdminSerializer(many=True, read_only=True)
+    class Meta:
+        model = Question
+        fields = ['id', 'text', 'options']
